@@ -1,0 +1,10 @@
+*.pyc
+*.sw*
+*__pycache__*
+tags
+.mypy_cache/
+venv/
+venv3/
+dag.dot
+*.gv
+*.gv.pdf
