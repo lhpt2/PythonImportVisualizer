@@ -5,6 +5,7 @@
 import argparse
 import dis
 import os
+import platform
 import sys
 from collections import defaultdict
 from modulefinder import ModuleFinder, Module as MFModule
@@ -36,6 +37,11 @@ PY_VERSION = sys.version_info[0]
 # Output file for dag visualization
 DAG_OUT = "dag.dot"
 
+# System Names
+LINUX_SYSTEM_NAME   = "Linux"
+DARWIN_SYSTEM_NAME  = "Darwin"
+JAVA_SYSTEM_NAME    = "Java"
+WINDOWS_SYSTEM_NAME = "Windows"
 
 def abs_mod_name(module, root_dir):
     """ From a Module's absolute path, and the root directory, return a
@@ -45,9 +51,16 @@ def abs_mod_name(module, root_dir):
     Example: abs_mod_name(Module('/path/to/mod.py'), '/path') -> 'to.mod'
     NOTE: no trailing '/' in root_dir
     """
+
     abs_path = os.path.abspath(module.__file__)
     rel_path = abs_path[len(root_dir) :]
-    path_parts = rel_path.split("/")[1:]
+
+    current_system = platform.system()
+    if current_system is WINDOWS_SYSTEM_NAME:
+        path_parts = rel_path.split("\\")[1:]
+    else:
+        path_parts = rel_path.split("/")[1:]
+
     path_parts[-1] = path_parts[-1][:-3]
     if path_parts[-1] == "__init__":
         del path_parts[-1]
