@@ -119,9 +119,9 @@ def get_modules_in_dir(root_dir, ignore_venv=True):
                 mod_file = os.path.abspath(os.path.join(top, nm))
                 mod_path = os.path.dirname(mod_file)
                 mod_name = mod_file[len(root_dir) + 1 :].replace("/", ".")[:-3]
-                if "__init__" in mod_name:
-                    mod_name = mod_name.replace(".__init__", "")
-                if mod_name not in mods:
+                # if "__init__" in mod_name:
+                #     mod_name = mod_name.replace(".__init__", "")
+                if "__init__" not in mod_name and mod_name not in mods:
                     mod = Module(mod_name, file=mod_file, path=mod_path)
                     mods[mod_name] = mod
     return mods
