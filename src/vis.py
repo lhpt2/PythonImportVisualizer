@@ -311,7 +311,7 @@ def get_args():
 
 
 def generate_pyvis_visualization(mod_dict):
-    net = Network()
+    net = Network(directed=True)
 
     modules_in_graph = set()
     for name, module in mod_dict.items():
