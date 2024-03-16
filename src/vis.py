@@ -9,6 +9,7 @@ import platform
 import sys
 from collections import defaultdict
 from modulefinder import ModuleFinder, Module as MFModule
+from pyvis.network import Network
 
 import graphviz
 
@@ -78,7 +79,7 @@ def get_modules_from_file(script, root_dir=None, use_sys_path=False):
     may be useful if you want to add stdlib modules
     :rtype: {str(module name): Module}
     """
-    script = os.path.abspath(script)
+    # script = os.path.abspath(script)
     if not root_dir:
         root_dir = os.path.dirname(script)
     path = [root_dir]
@@ -98,7 +99,7 @@ def get_modules_from_file(script, root_dir=None, use_sys_path=False):
         }
 
     # All the module names have to be as references from the root directory
-    modules = {abs_mod_name(mod, root_dir): mod for mod in modules.values()}
+    # modules = {abs_mod_name(mod, root_dir): mod for mod in modules.values()}
 
     return modules
 
@@ -309,6 +310,32 @@ def get_args():
     return parser.parse_args()
 
 
+def generate_pyvis_visualization(mod_dict, root_dir):
+    net = Network()
+
+    print("root_dir")
+    print(root_dir)
+
+    modules_in_graph = set()
+    for name, module in mod_dict.items():
+        # Check if module not already in graph from di
+        if name not in modules_in_graph:
+            net.add_node(name, label=name)
+            modules_in_graph.add(name)
+
+        for di in module.direct_imports:
+            # Check if di not already in graph
+            if di not in modules_in_graph:
+                net.add_node(di, label=di)
+                modules_in_graph.add(di)
+
+            # Add edge from name to di
+            net.add_edge(name, di)
+
+    net.show('mygraph.html', notebook=False)
+
+
+
 def main():
 
     args = get_args()
@@ -330,9 +357,13 @@ def main():
             print("    " + dep)
 
     project_name = os.path.basename(os.path.abspath(root_dir))
-    dag = mod_dict_to_dag(mod_dict, project_name)
-    dag.view()
 
+    # Creates the Graphvis visualization
+    # dag = mod_dict_to_dag(mod_dict, project_name)
+    # dag.view()
+
+    # Creates the pyvis visualization
+    generate_pyvis_visualization(mod_dict, root_dir)
 
 if __name__ == "__main__":
     main()
