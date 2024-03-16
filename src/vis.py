@@ -310,11 +310,8 @@ def get_args():
     return parser.parse_args()
 
 
-def generate_pyvis_visualization(mod_dict, root_dir):
+def generate_pyvis_visualization(mod_dict):
     net = Network()
-
-    print("root_dir")
-    print(root_dir)
 
     modules_in_graph = set()
     for name, module in mod_dict.items():
@@ -363,7 +360,7 @@ def main():
     # dag.view()
 
     # Creates the pyvis visualization
-    generate_pyvis_visualization(mod_dict, root_dir)
+    generate_pyvis_visualization(mod_dict)
 
 if __name__ == "__main__":
     main()
