@@ -10,6 +10,7 @@ import sys
 from collections import defaultdict
 from modulefinder import ModuleFinder, Module as MFModule
 from pyvis.network import Network
+import networkx as nx
 
 import graphviz
 
@@ -311,27 +312,54 @@ def get_args():
 
 
 def generate_pyvis_visualization(mod_dict):
-    net = Network(directed=True)
+    # Networkx graph for editing graph
+    nx_graph = nx.Graph()
 
     modules_in_graph = set()
     for name, module in mod_dict.items():
         # Check if module not already in graph from di
         if name not in modules_in_graph:
-            net.add_node(name, label=name)
+            nx_graph.add_node(name)
             modules_in_graph.add(name)
 
         for di in module.direct_imports:
             # Check if di not already in graph
             if di not in modules_in_graph:
-                net.add_node(di, label=di)
+                nx_graph.add_node(di)
                 modules_in_graph.add(di)
 
             # Add edge from name to di
-            net.add_edge(name, di)
+            nx_graph.add_edge(name, di)
 
+    net = Network(directed=True)
+    net.from_nx(nx_graph)
     net.show_buttons()
     net.toggle_physics(False)
     net.show('mygraph.html', notebook=False)
+
+    # The real graph
+    # net = Network(directed=True)
+
+    # modules_in_graph = set()
+    # for name, module in mod_dict.items():
+    #     # Check if module not already in graph from di
+    #     if name not in modules_in_graph:
+    #         net.add_node(name, label=name, val=len(module.direct_imports)*20, color="red")
+    #         modules_in_graph.add(name)
+
+    #     for di in module.direct_imports:
+    #         # Check if di not already in graph
+    #         if di not in modules_in_graph:
+    #             net.add_node(di, label=di)
+    #             modules_in_graph.add(di)
+
+    #         # Add edge from name to di
+    #         net.add_edge(name, di)
+
+    # # Showing the graph
+    # net.show_buttons()
+    # net.toggle_physics(False)
+    # net.show('mygraph.html', notebook=False)
 
 
 
