@@ -329,6 +329,8 @@ def generate_pyvis_visualization(mod_dict):
             # Add edge from name to di
             net.add_edge(name, di)
 
+    net.show_buttons()
+    net.toggle_physics(False)
     net.show('mygraph.html', notebook=False)
 
 
