@@ -321,12 +321,16 @@ def generate_pyvis_visualization(mod_dict):
         if name not in modules_in_graph:
             nx_graph.add_node(name)
             modules_in_graph.add(name)
+        else:
+            nx_graph.nodes[name]['color'] = 'red'
 
         for di in module.direct_imports:
             # Check if di not already in graph
             if di not in modules_in_graph:
                 nx_graph.add_node(di)
                 modules_in_graph.add(di)
+            # else:
+                # nx_graph.nodes[name]['color'] = 'yellow'
 
             # Add edge from name to di
             nx_graph.add_edge(name, di)
@@ -336,32 +340,6 @@ def generate_pyvis_visualization(mod_dict):
     net.show_buttons()
     net.toggle_physics(False)
     net.show('mygraph.html', notebook=False)
-
-    # The real graph
-    # net = Network(directed=True)
-
-    # modules_in_graph = set()
-    # for name, module in mod_dict.items():
-    #     # Check if module not already in graph from di
-    #     if name not in modules_in_graph:
-    #         net.add_node(name, label=name, val=len(module.direct_imports)*20, color="red")
-    #         modules_in_graph.add(name)
-
-    #     for di in module.direct_imports:
-    #         # Check if di not already in graph
-    #         if di not in modules_in_graph:
-    #             net.add_node(di, label=di)
-    #             modules_in_graph.add(di)
-
-    #         # Add edge from name to di
-    #         net.add_edge(name, di)
-
-    # # Showing the graph
-    # net.show_buttons()
-    # net.toggle_physics(False)
-    # net.show('mygraph.html', notebook=False)
-
-
 
 def main():
 
