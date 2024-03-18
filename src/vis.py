@@ -4,11 +4,13 @@
 
 import argparse
 import dis
+import matplotlib.colors as mc
 import os
 import platform
 import sys
 from collections import defaultdict
 from modulefinder import ModuleFinder, Module as MFModule
+from matplotlib.colors import hsv_to_rgb
 from pyvis.network import Network
 import networkx as nx
 
@@ -312,6 +314,31 @@ def get_args():
 
 
 def generate_pyvis_visualization(mod_dict):
+    def get_hex_color_of_shade(value):
+        if value < 0 or value > 1:
+            raise ValueError("Input value must be between 0 and 1")
+        
+        scaled_val = value * 100
+
+        if scaled_val <= 50:
+            r = 255
+            g = int(255*scaled_val/50)
+            b = 0
+        else:
+            r = int(255*(100-scaled_val)/50)
+            g = 255
+            b = 0
+
+        return "#%s%s%s" % tuple([hex(c)[2:].rjust(2, "0") for c in (r, g, b)])
+
+    def normaliz_between_n1_1(min, max, val):
+        if min == max:
+            return 0
+        else:
+            zero_min = val - min
+            scaled_val = zero_min / (max-min)
+            return scaled_val
+
     # Networkx graph for editing graph
     nx_graph = nx.Graph()
 
@@ -329,11 +356,27 @@ def generate_pyvis_visualization(mod_dict):
             if di not in modules_in_graph:
                 nx_graph.add_node(di)
                 modules_in_graph.add(di)
-            # else:
-                # nx_graph.nodes[name]['color'] = 'yellow'
 
             # Add edge from name to di
             nx_graph.add_edge(name, di)
+
+    # Get max/min degree to normaliz between -1 and 1
+    max_degree = -1
+    min_degree = 10000
+    first = True
+    for node in nx_graph.nodes:
+        if first:
+            max_degree = nx_graph.degree(node)
+            min_degree = nx_graph.degree(node)
+            first = False
+        else:
+            max_degree = max(max_degree, nx_graph.degree(node))
+            min_degree = min(min_degree, nx_graph.degree(node))
+
+    # Check number of edges in a node
+    for node in nx_graph.nodes:
+        norm_val = normaliz_between_n1_1(min_degree, max_degree, nx_graph.degree(node))
+        nx_graph.nodes[node]['color'] = get_hex_color_of_shade(norm_val)
 
     net = Network(directed=True)
     net.from_nx(nx_graph)
