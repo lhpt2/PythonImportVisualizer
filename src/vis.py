@@ -376,12 +376,14 @@ def generate_pyvis_visualization(mod_dict):
     # Check number of edges in a node
     for node in nx_graph.nodes:
         norm_val = normaliz_between_n1_1(min_degree, max_degree, nx_graph.degree(node))
+        size = 20 + 35 * norm_val 
+        nx_graph.nodes[node]['size'] = size
         nx_graph.nodes[node]['color'] = get_hex_color_of_shade(norm_val)
 
     net = Network(directed=True)
     net.from_nx(nx_graph)
     net.show_buttons()
-    net.toggle_physics(False)
+    net.toggle_physics(True)
     net.show('mygraph.html', notebook=False)
 
 def main():
