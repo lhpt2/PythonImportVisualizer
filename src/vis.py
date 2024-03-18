@@ -9,6 +9,8 @@ import platform
 import sys
 from collections import defaultdict
 from modulefinder import ModuleFinder, Module as MFModule
+from pyvis.network import Network
+import networkx as nx
 
 import graphviz
 
@@ -78,7 +80,7 @@ def get_modules_from_file(script, root_dir=None, use_sys_path=False):
     may be useful if you want to add stdlib modules
     :rtype: {str(module name): Module}
     """
-    script = os.path.abspath(script)
+    # script = os.path.abspath(script)
     if not root_dir:
         root_dir = os.path.dirname(script)
     path = [root_dir]
@@ -98,7 +100,7 @@ def get_modules_from_file(script, root_dir=None, use_sys_path=False):
         }
 
     # All the module names have to be as references from the root directory
-    modules = {abs_mod_name(mod, root_dir): mod for mod in modules.values()}
+    # modules = {abs_mod_name(mod, root_dir): mod for mod in modules.values()}
 
     return modules
 
@@ -118,9 +120,9 @@ def get_modules_in_dir(root_dir, ignore_venv=True):
                 mod_file = os.path.abspath(os.path.join(top, nm))
                 mod_path = os.path.dirname(mod_file)
                 mod_name = mod_file[len(root_dir) + 1 :].replace("/", ".")[:-3]
-                if "__init__" in mod_name:
-                    mod_name = mod_name.replace(".__init__", "")
-                if mod_name not in mods:
+                # if "__init__" in mod_name:
+                #     mod_name = mod_name.replace(".__init__", "")
+                if "__init__" not in mod_name and mod_name not in mods:
                     mod = Module(mod_name, file=mod_file, path=mod_path)
                     mods[mod_name] = mod
     return mods
@@ -309,6 +311,36 @@ def get_args():
     return parser.parse_args()
 
 
+def generate_pyvis_visualization(mod_dict):
+    # Networkx graph for editing graph
+    nx_graph = nx.Graph()
+
+    modules_in_graph = set()
+    for name, module in mod_dict.items():
+        # Check if module not already in graph from di
+        if name not in modules_in_graph:
+            nx_graph.add_node(name)
+            modules_in_graph.add(name)
+        else:
+            nx_graph.nodes[name]['color'] = 'red'
+
+        for di in module.direct_imports:
+            # Check if di not already in graph
+            if di not in modules_in_graph:
+                nx_graph.add_node(di)
+                modules_in_graph.add(di)
+            # else:
+                # nx_graph.nodes[name]['color'] = 'yellow'
+
+            # Add edge from name to di
+            nx_graph.add_edge(name, di)
+
+    net = Network(directed=True)
+    net.from_nx(nx_graph)
+    net.show_buttons()
+    net.toggle_physics(False)
+    net.show('mygraph.html', notebook=False)
+
 def main():
 
     args = get_args()
@@ -330,9 +362,13 @@ def main():
             print("    " + dep)
 
     project_name = os.path.basename(os.path.abspath(root_dir))
-    dag = mod_dict_to_dag(mod_dict, project_name)
-    dag.view()
 
+    # Creates the Graphvis visualization
+    # dag = mod_dict_to_dag(mod_dict, project_name)
+    # dag.view()
+
+    # Creates the pyvis visualization
+    generate_pyvis_visualization(mod_dict)
 
 if __name__ == "__main__":
     main()
