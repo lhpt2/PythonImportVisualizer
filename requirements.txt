@@ -3,3 +3,5 @@ matplotlib==3.8.4
 networkx==3.3
 pyvis==0.3.2
 setuptools==69.5.1
+scipy==1.13.0
+pydot==2.0.0

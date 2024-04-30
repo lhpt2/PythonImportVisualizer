@@ -13,6 +13,7 @@ from modulefinder import ModuleFinder, Module as MFModule
 from matplotlib.colors import hsv_to_rgb
 from pyvis.network import Network
 import networkx as nx
+from networkx.drawing.nx_pydot import write_dot
 
 import graphviz
 
@@ -307,13 +308,20 @@ def get_args():
         help="alternate root, if the project root differs from"
         " the directory that the main script is in",
     )
+    parser.add_argument(
+        "-d",
+        "--dot",
+        dest="dotfile",
+        type=str,
+        help="generate dotfile of graph",
+    )
     # TODO implement ability to ignore certain modules
     # parser.add_argument('-i', '--ignore', dest='ignorefile', type=str,
     # help='file that contains names of modules to ignore')
     return parser.parse_args()
 
 
-def generate_pyvis_visualization(mod_dict):
+def generate_pyvis_visualization(mod_dict, dotfile=''):
     def get_hex_color_of_shade(value):
         if value < 0 or value > 1:
             raise ValueError("Input value must be between 0 and 1")
@@ -380,6 +388,10 @@ def generate_pyvis_visualization(mod_dict):
         nx_graph.nodes[node]['size'] = size
         nx_graph.nodes[node]['color'] = get_hex_color_of_shade(norm_val)
 
+    if dotfile:
+        nx.draw(nx_graph)
+        write_dot(nx_graph, dotfile)
+
     net = Network(directed=True)
     net.from_nx(nx_graph)
     net.show_buttons()
@@ -398,6 +410,8 @@ def main():
     else:
         root_dir = args.path
         mod_dict = get_modules_in_dir(root_dir)
+    
+        
 
     add_immediate_deps_to_modules(mod_dict)
     print("Module dependencies:")
@@ -413,7 +427,10 @@ def main():
     # dag.view()
 
     # Creates the pyvis visualization
-    generate_pyvis_visualization(mod_dict)
+    if args.dotfile is not None:
+        generate_pyvis_visualization(mod_dict, dotfile=args.dotfile)
+    else:
+        generate_pyvis_visualization(mod_dict)
 
 if __name__ == "__main__":
     main()
