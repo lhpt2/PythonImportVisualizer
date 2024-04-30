@@ -8,6 +8,7 @@ import matplotlib.colors as mc
 import os
 import platform
 import sys
+import filter
 from collections import defaultdict
 from modulefinder import ModuleFinder, Module as MFModule
 from matplotlib.colors import hsv_to_rgb
@@ -72,7 +73,6 @@ def abs_mod_name(module, root_dir):
     mod_name = ".".join(path_parts)
     return mod_name
 
-
 def get_modules_from_file(script, root_dir=None, use_sys_path=False):
     """ Use ModuleFinder.load_file() to get module imports for the given
     script.
@@ -107,7 +107,6 @@ def get_modules_from_file(script, root_dir=None, use_sys_path=False):
 
     return modules
 
-
 def get_modules_in_dir(root_dir, ignore_venv=True):
     """ Walk a directory recursively and get the module imports for all .py
     files in the directory.
@@ -130,7 +129,6 @@ def get_modules_in_dir(root_dir, ignore_venv=True):
                     mods[mod_name] = mod
     return mods
 
-
 class Module(MFModule, object):
     """ Extension of modulefinder.ModuleFinder to add custom attrs. """
 
@@ -140,7 +138,6 @@ class Module(MFModule, object):
         # keys = the fully qualified names of this module's direct imports
         # value = list of names imported from that module
         self.direct_imports = {}
-
 
 def _unpack_opargs(code):
     """ Step through the python bytecode and generate a tuple (int, int, int):
@@ -169,7 +166,6 @@ def _unpack_opargs(code):
                 i += 1
             yield (i, op, arg)
     # Python 1?
-
 
 def scan_opcodes(compiled):
     """
@@ -214,8 +210,7 @@ def scan_opcodes(compiled):
                 yield REL_IMPORT, (level, fromlist, names[oparg])
             continue
 
-
-def get_fq_immediate_deps(all_mods, module):
+def get_fq_immediate_deps(all_mods, module, filterfunc=None):
     """
     From a Module, using the module's absolute path, compile the code and then
     search through it for the imports and get a list of the immediately
@@ -239,9 +234,14 @@ def get_fq_immediate_deps(all_mods, module):
 
             if op == ABS_IMPORT:
                 names, top = args
+                if filterfunc is not None: 
+                    filter_result = filterfunc(names, top)
+                else:    
+                    filter_result = True
                 if (
                     not is_std_lib_module(top.split(".")[0], PY_VERSION)
                     or top in all_mods
+                    or filter_result
                 ):
                     if not names:
                         fq_deps[top].append([])
@@ -259,16 +259,14 @@ def get_fq_immediate_deps(all_mods, module):
 
     return fq_deps
 
-
-def add_immediate_deps_to_modules(mod_dict):
+def add_immediate_deps_to_modules(mod_dict, filterfunc=None):
     """ Take a module dictionary, and add the names of the modules directly
     imported by each module in the dictionary, and add them to the module's
     direct_imports.
     """
     for name, module in sorted(mod_dict.items()):
-        fq_deps = get_fq_immediate_deps(mod_dict, module)
+        fq_deps = get_fq_immediate_deps(mod_dict, module, filterfunc=filterfunc)
         module.direct_imports = fq_deps
-
 
 def mod_dict_to_dag(mod_dict, graph_name):
     """ Take a module dictionary, and return a graphviz.Digraph object
@@ -287,7 +285,6 @@ def mod_dict_to_dag(mod_dict, graph_name):
                     vendor_mods.add(di)
             dag.edge(name, di, **attrs)
     return dag
-
 
 def get_args():
     """ Parse and return command line args. """
@@ -319,7 +316,6 @@ def get_args():
     # parser.add_argument('-i', '--ignore', dest='ignorefile', type=str,
     # help='file that contains names of modules to ignore')
     return parser.parse_args()
-
 
 def generate_pyvis_visualization(mod_dict, dotfile=''):
     def get_hex_color_of_shade(value):
@@ -411,9 +407,11 @@ def main():
         root_dir = args.path
         mod_dict = get_modules_in_dir(root_dir)
     
-        
+    filterfunc=lambda names, top: True        
+    if filter.filterfunc is not None:
+         filterfunc=filter.filterfunc
 
-    add_immediate_deps_to_modules(mod_dict)
+    add_immediate_deps_to_modules(mod_dict, filterfunc=filterfunc)
     print("Module dependencies:")
     for name, module in sorted(mod_dict.items()):
         print("\n" + name)
