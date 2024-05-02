@@ -218,7 +218,7 @@ def scan_opcodes(compiled):
                 yield REL_IMPORT, (level, fromlist, names[oparg])
             continue
 
-def get_fq_immediate_deps(all_mods, module, pkgfilterfunc: Callable[[str], bool]=lambda topmodname: True, modfilterfunc: Callable[[str, str], bool]=lambda name, parentname: True):
+def get_fq_immediate_deps(all_mods, module, modfilterfunc: Callable[[str, str], bool]=lambda name, parentname: True):
     """
     From a Module, using the module's absolute path, compile the code and then
     search through it for the imports and get a list of the immediately
@@ -245,14 +245,16 @@ def get_fq_immediate_deps(all_mods, module, pkgfilterfunc: Callable[[str], bool]
                 if (
                     not is_std_lib_module(top.split(".")[0], PY_VERSION)
                     or top in all_mods
-                    or pkgfilterfunc(top)
+                    or modfilterfunc("", top)
                 ):
                     if not names:
                         fq_deps[top].append([])
                     for name in names:
                         fq_name = top + "." + name
                         if not modfilterfunc(name, top):
+                            eprint("EXCLUDE: ", top, "->", name)
                             continue
+
                         if fq_name in all_mods:
                             # just to make sure it's in the dict
                             fq_deps[fq_name].append([])
@@ -265,13 +267,13 @@ def get_fq_immediate_deps(all_mods, module, pkgfilterfunc: Callable[[str], bool]
 
     return fq_deps
 
-def add_immediate_deps_to_modules(mod_dict, pkgfilterfunc: Callable[[str], bool]=lambda topname: True, modfilterfunc: Callable[[str, str], bool]=lambda name, parentname: True):
+def add_immediate_deps_to_modules(mod_dict, modfilterfunc: Callable[[str, str], bool]=lambda name, parentname: True):
     """ Take a module dictionary, and add the names of the modules directly
     imported by each module in the dictionary, and add them to the module's
     direct_imports.
     """
     for name, module in sorted(mod_dict.items()):
-        fq_deps = get_fq_immediate_deps(mod_dict, module, pkgfilterfunc=pkgfilterfunc, modfilterfunc=modfilterfunc)
+        fq_deps = get_fq_immediate_deps(mod_dict, module, modfilterfunc=modfilterfunc)
         module.direct_imports = fq_deps
 
 def mod_dict_to_dag(mod_dict, graph_name):
@@ -419,17 +421,11 @@ def main():
     if modfilter is None:
         add_immediate_deps_to_modules(mod_dict)
     else:
-        hasfunctions = [hasattr(modfilter, "pkgfilterfunc"), hasattr(modfilter, "modfilterfunc")]
-        match hasfunctions:
-            case [False, False]:
+        match hasattr(modfilter, "modfilterfunc"):
+            case False:
                 endnotice = True
                 add_immediate_deps_to_modules(mod_dict)
-            case [True, True]:
-                add_immediate_deps_to_modules(mod_dict, pkgfilterfunc=modfilter.pkgfilterfunc, modfilterfunc=modfilter.modfilterfunc)
-            case [True, False]:
-                add_immediate_deps_to_modules(mod_dict)
-                add_immediate_deps_to_modules(mod_dict, pkgfilterfunc=modfilter.pkgfilterfunc)
-            case [False, True]:
+            case True:
                 add_immediate_deps_to_modules(mod_dict, modfilterfunc=modfilter.modfilterfunc)
 
     print("Module dependencies:")
@@ -449,9 +445,9 @@ def main():
         generate_pyvis_visualization(mod_dict, dotfile=args.dotfile)
     else:
         generate_pyvis_visualization(mod_dict)
-    
+
     if endnotice:
-        eprint("Notice: consider adding a filter function (either pkgfilterfunc or modfilterfunc) to modfilter module or removing modfilter module completely")
+        eprint("Notice: consider adding a filter function (modfilterfunc) to modfilter module or removing modfilter module completely.")
 
 if __name__ == "__main__":
     main()
