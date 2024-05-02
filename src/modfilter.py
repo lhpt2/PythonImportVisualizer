@@ -1,11 +1,15 @@
 from typing import Callable, Dict
 import sys
 
+def eprint(content, end="\n"):
+        print(content, file=sys.stderr, end=end)
+
 # example filterfunction to filter modules that import other modules
 def parent_mod_filter_func(mod_dict: Dict) -> Dict:
         temp = dict(mod_dict)
         for name, _ in mod_dict.items(): 
                 if not parent_filter(name):
+                        eprint("Filter: ", name)
                         del temp[name]
         return temp 
 
