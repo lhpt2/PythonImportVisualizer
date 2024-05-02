@@ -4,22 +4,26 @@
 
 import argparse
 import dis
+import graphviz
+import importlib.util
 import matplotlib.colors as mc
+import networkx as nx
 import os
 import platform
 import sys
-import filter
 from collections import defaultdict
+from libinfo import is_std_lib_module
 from modulefinder import ModuleFinder, Module as MFModule
 from matplotlib.colors import hsv_to_rgb
-from pyvis.network import Network
-import networkx as nx
 from networkx.drawing.nx_pydot import write_dot
+from pyvis.network import Network
+from typing import Callable
 
-import graphviz
 
-from libinfo import is_std_lib_module
-
+if importlib.util.find_spec('modfilter', __package__) is not None:
+    import modfilter
+else:
+    modfilter = None
 
 # actual opcodes
 LOAD_CONST = dis.opmap["LOAD_CONST"]
@@ -48,6 +52,10 @@ LINUX_SYSTEM_NAME   = "Linux"
 DARWIN_SYSTEM_NAME  = "Darwin"
 JAVA_SYSTEM_NAME    = "Java"
 WINDOWS_SYSTEM_NAME = "Windows"
+
+# function for logging (to stderr)
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 def abs_mod_name(module, root_dir):
     """ From a Module's absolute path, and the root directory, return a
@@ -210,7 +218,7 @@ def scan_opcodes(compiled):
                 yield REL_IMPORT, (level, fromlist, names[oparg])
             continue
 
-def get_fq_immediate_deps(all_mods, module, filterfunc=None):
+def get_fq_immediate_deps(all_mods, module, pkgfilterfunc: Callable[[str], bool]=lambda topmodname: True, modfilterfunc: Callable[[str, str], bool]=lambda name, parentname: True):
     """
     From a Module, using the module's absolute path, compile the code and then
     search through it for the imports and get a list of the immediately
@@ -234,19 +242,17 @@ def get_fq_immediate_deps(all_mods, module, filterfunc=None):
 
             if op == ABS_IMPORT:
                 names, top = args
-                if filterfunc is not None: 
-                    filter_result = filterfunc(names, top)
-                else:    
-                    filter_result = True
                 if (
                     not is_std_lib_module(top.split(".")[0], PY_VERSION)
                     or top in all_mods
-                    or filter_result
+                    or pkgfilterfunc(top)
                 ):
                     if not names:
                         fq_deps[top].append([])
                     for name in names:
                         fq_name = top + "." + name
+                        if not modfilterfunc(name, top):
+                            continue
                         if fq_name in all_mods:
                             # just to make sure it's in the dict
                             fq_deps[fq_name].append([])
@@ -259,13 +265,13 @@ def get_fq_immediate_deps(all_mods, module, filterfunc=None):
 
     return fq_deps
 
-def add_immediate_deps_to_modules(mod_dict, filterfunc=None):
+def add_immediate_deps_to_modules(mod_dict, pkgfilterfunc: Callable[[str], bool]=lambda topname: True, modfilterfunc: Callable[[str, str], bool]=lambda name, parentname: True):
     """ Take a module dictionary, and add the names of the modules directly
     imported by each module in the dictionary, and add them to the module's
     direct_imports.
     """
     for name, module in sorted(mod_dict.items()):
-        fq_deps = get_fq_immediate_deps(mod_dict, module, filterfunc=filterfunc)
+        fq_deps = get_fq_immediate_deps(mod_dict, module, pkgfilterfunc=pkgfilterfunc, modfilterfunc=modfilterfunc)
         module.direct_imports = fq_deps
 
 def mod_dict_to_dag(mod_dict, graph_name):
@@ -396,6 +402,8 @@ def generate_pyvis_visualization(mod_dict, dotfile=''):
 
 def main():
 
+    endnotice = False
+
     args = get_args()
     if args.path[-3:] == ".py":
         script = args.path
@@ -406,12 +414,24 @@ def main():
     else:
         root_dir = args.path
         mod_dict = get_modules_in_dir(root_dir)
-    
-    filterfunc=lambda names, top: True        
-    if filter.filterfunc is not None:
-         filterfunc=filter.filterfunc
 
-    add_immediate_deps_to_modules(mod_dict, filterfunc=filterfunc)
+    # check for filterfunction callback to be present, else use stub lambda
+    if modfilter is None:
+        add_immediate_deps_to_modules(mod_dict)
+    else:
+        hasfunctions = [hasattr(modfilter, "pkgfilterfunc"), hasattr(modfilter, "modfilterfunc")]
+        match hasfunctions:
+            case [False, False]:
+                endnotice = True
+                add_immediate_deps_to_modules(mod_dict)
+            case [True, True]:
+                add_immediate_deps_to_modules(mod_dict, pkgfilterfunc=modfilter.pkgfilterfunc, modfilterfunc=modfilter.modfilterfunc)
+            case [True, False]:
+                add_immediate_deps_to_modules(mod_dict)
+                add_immediate_deps_to_modules(mod_dict, pkgfilterfunc=modfilter.pkgfilterfunc)
+            case [False, True]:
+                add_immediate_deps_to_modules(mod_dict, modfilterfunc=modfilter.modfilterfunc)
+
     print("Module dependencies:")
     for name, module in sorted(mod_dict.items()):
         print("\n" + name)
@@ -429,6 +449,9 @@ def main():
         generate_pyvis_visualization(mod_dict, dotfile=args.dotfile)
     else:
         generate_pyvis_visualization(mod_dict)
+    
+    if endnotice:
+        eprint("Notice: consider adding a filter function (either pkgfilterfunc or modfilterfunc) to modfilter module or removing modfilter module completely")
 
 if __name__ == "__main__":
     main()
