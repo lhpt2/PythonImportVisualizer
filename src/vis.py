@@ -4,21 +4,26 @@
 
 import argparse
 import dis
+import graphviz
+import importlib.util
 import matplotlib.colors as mc
+import networkx as nx
 import os
 import platform
 import sys
 from collections import defaultdict
+from libinfo import is_std_lib_module
 from modulefinder import ModuleFinder, Module as MFModule
 from matplotlib.colors import hsv_to_rgb
-from pyvis.network import Network
-import networkx as nx
 from networkx.drawing.nx_pydot import write_dot
+from pyvis.network import Network
+from typing import Callable
 
-import graphviz
 
-from libinfo import is_std_lib_module
-
+if importlib.util.find_spec('modfilter', __package__) is not None:
+    import modfilter
+else:
+    modfilter = None
 
 # actual opcodes
 LOAD_CONST = dis.opmap["LOAD_CONST"]
@@ -48,6 +53,10 @@ DARWIN_SYSTEM_NAME  = "Darwin"
 JAVA_SYSTEM_NAME    = "Java"
 WINDOWS_SYSTEM_NAME = "Windows"
 
+# function for logging (to stderr)
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
 def abs_mod_name(module, root_dir):
     """ From a Module's absolute path, and the root directory, return a
     string with how that module would be imported from a script in the root
@@ -71,7 +80,6 @@ def abs_mod_name(module, root_dir):
         del path_parts[-1]
     mod_name = ".".join(path_parts)
     return mod_name
-
 
 def get_modules_from_file(script, root_dir=None, use_sys_path=False):
     """ Use ModuleFinder.load_file() to get module imports for the given
@@ -107,7 +115,6 @@ def get_modules_from_file(script, root_dir=None, use_sys_path=False):
 
     return modules
 
-
 def get_modules_in_dir(root_dir, ignore_venv=True):
     """ Walk a directory recursively and get the module imports for all .py
     files in the directory.
@@ -130,7 +137,6 @@ def get_modules_in_dir(root_dir, ignore_venv=True):
                     mods[mod_name] = mod
     return mods
 
-
 class Module(MFModule, object):
     """ Extension of modulefinder.ModuleFinder to add custom attrs. """
 
@@ -140,7 +146,6 @@ class Module(MFModule, object):
         # keys = the fully qualified names of this module's direct imports
         # value = list of names imported from that module
         self.direct_imports = {}
-
 
 def _unpack_opargs(code):
     """ Step through the python bytecode and generate a tuple (int, int, int):
@@ -169,7 +174,6 @@ def _unpack_opargs(code):
                 i += 1
             yield (i, op, arg)
     # Python 1?
-
 
 def scan_opcodes(compiled):
     """
@@ -214,8 +218,7 @@ def scan_opcodes(compiled):
                 yield REL_IMPORT, (level, fromlist, names[oparg])
             continue
 
-
-def get_fq_immediate_deps(all_mods, module):
+def get_fq_immediate_deps(all_mods, module, pkgfilterfunc: Callable[[str], bool]=lambda topmodname: True, modfilterfunc: Callable[[str, str], bool]=lambda name, parentname: True):
     """
     From a Module, using the module's absolute path, compile the code and then
     search through it for the imports and get a list of the immediately
@@ -242,11 +245,14 @@ def get_fq_immediate_deps(all_mods, module):
                 if (
                     not is_std_lib_module(top.split(".")[0], PY_VERSION)
                     or top in all_mods
+                    or pkgfilterfunc(top)
                 ):
                     if not names:
                         fq_deps[top].append([])
                     for name in names:
                         fq_name = top + "." + name
+                        if not modfilterfunc(name, top):
+                            continue
                         if fq_name in all_mods:
                             # just to make sure it's in the dict
                             fq_deps[fq_name].append([])
@@ -259,16 +265,14 @@ def get_fq_immediate_deps(all_mods, module):
 
     return fq_deps
 
-
-def add_immediate_deps_to_modules(mod_dict):
+def add_immediate_deps_to_modules(mod_dict, pkgfilterfunc: Callable[[str], bool]=lambda topname: True, modfilterfunc: Callable[[str, str], bool]=lambda name, parentname: True):
     """ Take a module dictionary, and add the names of the modules directly
     imported by each module in the dictionary, and add them to the module's
     direct_imports.
     """
     for name, module in sorted(mod_dict.items()):
-        fq_deps = get_fq_immediate_deps(mod_dict, module)
+        fq_deps = get_fq_immediate_deps(mod_dict, module, pkgfilterfunc=pkgfilterfunc, modfilterfunc=modfilterfunc)
         module.direct_imports = fq_deps
-
 
 def mod_dict_to_dag(mod_dict, graph_name):
     """ Take a module dictionary, and return a graphviz.Digraph object
@@ -287,7 +291,6 @@ def mod_dict_to_dag(mod_dict, graph_name):
                     vendor_mods.add(di)
             dag.edge(name, di, **attrs)
     return dag
-
 
 def get_args():
     """ Parse and return command line args. """
@@ -319,7 +322,6 @@ def get_args():
     # parser.add_argument('-i', '--ignore', dest='ignorefile', type=str,
     # help='file that contains names of modules to ignore')
     return parser.parse_args()
-
 
 def generate_pyvis_visualization(mod_dict, dotfile=''):
     def get_hex_color_of_shade(value):
@@ -400,6 +402,8 @@ def generate_pyvis_visualization(mod_dict, dotfile=''):
 
 def main():
 
+    endnotice = False
+
     args = get_args()
     if args.path[-3:] == ".py":
         script = args.path
@@ -410,10 +414,24 @@ def main():
     else:
         root_dir = args.path
         mod_dict = get_modules_in_dir(root_dir)
-    
-        
 
-    add_immediate_deps_to_modules(mod_dict)
+    # check for filterfunction callback to be present, else use stub lambda
+    if modfilter is None:
+        add_immediate_deps_to_modules(mod_dict)
+    else:
+        hasfunctions = [hasattr(modfilter, "pkgfilterfunc"), hasattr(modfilter, "modfilterfunc")]
+        match hasfunctions:
+            case [False, False]:
+                endnotice = True
+                add_immediate_deps_to_modules(mod_dict)
+            case [True, True]:
+                add_immediate_deps_to_modules(mod_dict, pkgfilterfunc=modfilter.pkgfilterfunc, modfilterfunc=modfilter.modfilterfunc)
+            case [True, False]:
+                add_immediate_deps_to_modules(mod_dict)
+                add_immediate_deps_to_modules(mod_dict, pkgfilterfunc=modfilter.pkgfilterfunc)
+            case [False, True]:
+                add_immediate_deps_to_modules(mod_dict, modfilterfunc=modfilter.modfilterfunc)
+
     print("Module dependencies:")
     for name, module in sorted(mod_dict.items()):
         print("\n" + name)
@@ -431,6 +449,9 @@ def main():
         generate_pyvis_visualization(mod_dict, dotfile=args.dotfile)
     else:
         generate_pyvis_visualization(mod_dict)
+    
+    if endnotice:
+        eprint("Notice: consider adding a filter function (either pkgfilterfunc or modfilterfunc) to modfilter module or removing modfilter module completely")
 
 if __name__ == "__main__":
     main()
