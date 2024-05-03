@@ -243,17 +243,15 @@ def get_fq_immediate_deps(all_mods, module, modfilterfunc: Callable[[str, str], 
             if op == ABS_IMPORT:
                 names, top = args
                 if (
-                    not is_std_lib_module(top.split(".")[0], PY_VERSION)
-                    or top in all_mods
+                    (not is_std_lib_module(top.split(".")[0], PY_VERSION)
+                    or top in all_mods)
                     and modfilterfunc("", top)
                 ):
                     if not names:
-                        #eprint("ADDING ", top)
                         fq_deps[top].append([])
                     for name in names:
                         fq_name = top + "." + name
                         if not modfilterfunc(name, top):
-                            #eprint("Exclude ", top, "->", name)
                             continue
 
                         if fq_name in all_mods:
