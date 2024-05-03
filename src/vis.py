@@ -395,11 +395,11 @@ def generate_pyvis_visualization(mod_dict, dotfile=''):
         nx.draw(nx_graph)
         write_dot(nx_graph, dotfile)
 
-    # net = Network(directed=True)
-    # net.from_nx(nx_graph)
-    # net.show_buttons()
-    # net.toggle_physics(True)
-    # net.show('mygraph.html', notebook=False)
+    net = Network(directed=True)
+    net.from_nx(nx_graph)
+    net.show_buttons()
+    net.toggle_physics(True)
+    net.show('mygraph.html', notebook=False)
 
 def main():
 
