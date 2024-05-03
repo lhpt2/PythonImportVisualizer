@@ -1,8 +1,8 @@
 from typing import Callable, Dict
 import sys
 
-def eprint(content, end="\n"):
-        print(content, file=sys.stderr, end=end)
+def eprint(*args, **kwargs):
+        print(*args, file=sys.stderr, **kwargs)
 
 # example filterfunction to filter modules that import other modules
 def parent_mod_filter_func(mod_dict: Dict) -> Dict:
@@ -18,7 +18,7 @@ def parent_filter(modname: str) -> bool:
 # example filterfunction for filtering specific module
 # return false to exclude module 
 def import_mod_filter_func(modname: str, parentname: str) -> bool:
-        return not (is_test_module(parentname) or is_logging_module(parentname) or is_django_module(modname))
+        return not (is_test_module(parentname) or is_logging_module(parentname) or is_django_module(parentname))
 
 
 is_test_module: Callable[[str], bool] = lambda modname: '.tests' in modname
