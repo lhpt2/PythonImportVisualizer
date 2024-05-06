@@ -426,10 +426,13 @@ def main():
                 mod_dict = modfilter.parent_mod_filter_func(mod_dict)
         match hasattr(modfilter, "import_mod_filter_func"):
             case False:
-                endnotice = True
                 add_immediate_deps_to_modules(mod_dict)
             case True:
                 add_immediate_deps_to_modules(mod_dict, modfilterfunc=modfilter.import_mod_filter_func)
+
+        # print notice to either implement one of the callbacks or consider removing modfilter module
+        if not hasattr(modfilter, "parent_mod_filter_func") and hasattr(modfilter, "import_mod_filter_func"):
+            endnotice = True
 
     print("Module dependencies:")
     for name, module in sorted(mod_dict.items()):
@@ -450,7 +453,7 @@ def main():
         generate_pyvis_visualization(mod_dict)
 
     if endnotice:
-        eprint("Notice: consider adding a filter function (modfilterfunc) to modfilter module or removing modfilter module completely.")
+        eprint("Notice: consider adding one of the filter functions (parent_mod_filter_func or import_mod_filter_func) to modfilter module or removing modfilter module completely.")
 
 if __name__ == "__main__":
     main()
