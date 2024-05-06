@@ -243,9 +243,9 @@ def get_fq_immediate_deps(all_mods, module, modfilterfunc: Callable[[str, str], 
             if op == ABS_IMPORT:
                 names, top = args
                 if (
-                    not is_std_lib_module(top.split(".")[0], PY_VERSION)
-                    or top in all_mods
-                    or modfilterfunc("", top)
+                    (not is_std_lib_module(top.split(".")[0], PY_VERSION)
+                    or top in all_mods)
+                    and modfilterfunc("", top)
                 ):
                     if not names:
                         fq_deps[top].append([])
@@ -421,12 +421,15 @@ def main():
     if modfilter is None:
         add_immediate_deps_to_modules(mod_dict)
     else:
-        match hasattr(modfilter, "modfilterfunc"):
+        match hasattr(modfilter, "parent_mod_filter_func"):
+            case True:
+                mod_dict = modfilter.parent_mod_filter_func(mod_dict)
+        match hasattr(modfilter, "import_mod_filter_func"):
             case False:
                 endnotice = True
                 add_immediate_deps_to_modules(mod_dict)
             case True:
-                add_immediate_deps_to_modules(mod_dict, modfilterfunc=modfilter.modfilterfunc)
+                add_immediate_deps_to_modules(mod_dict, modfilterfunc=modfilter.import_mod_filter_func)
 
     print("Module dependencies:")
     for name, module in sorted(mod_dict.items()):
