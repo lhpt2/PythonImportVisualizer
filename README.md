@@ -29,6 +29,8 @@ pip install -r requirements.txt
 ```
 # must have venv/venv3 activated
 $ python src/vis.py <root project directory>
+# show help and optional cmd flags
+$ python src/vis.py -h 
 ```
 
 __Example:__
@@ -68,3 +70,12 @@ Also displays with `graphviz`:
 Another example graph from a [slightly more substantial project](https://github.com/nicolashahn/set-solver) (blue arrows/nodes indicate modules where the code does not live in the project directory [such as modules installed through pip]):
 
 ![](examples/set-solver.png)
+
+### Custom filter logic
+
+If not existent create a module `modfilter.py` alongside `vis.py` in src/ and add one or both of the following two callback functions:
+`parent_mod_filter_func(mod_dict: Dict) -> Dict`
+`import_mod_filter_func(modname: str, parentname: str) -> bool`
+
+vis.py checks for a module modfilter.py and these two callback functions as part of the modfilter module and calls them during processing
+if existent to allow for custom filtering of modules. A commented example `modfilter.py` is already included in the project.
