@@ -320,12 +320,20 @@ def get_args():
         type=str,
         help="generate dotfile of graph",
     )
+    parser.add_argument(
+        "-s",
+        "--show",
+        default=False,
+        dest="show_graph",
+        action="store_true",
+        help="visualize graph in browser (static html page)",
+    )
     # TODO implement ability to ignore certain modules
     # parser.add_argument('-i', '--ignore', dest='ignorefile', type=str,
     # help='file that contains names of modules to ignore')
     return parser.parse_args()
 
-def generate_pyvis_visualization(mod_dict, dotfile=''):
+def generate_pyvis_visualization(mod_dict, dotfile='', show=False):
     def get_hex_color_of_shade(value):
         if value < 0 or value > 1:
             raise ValueError("Input value must be between 0 and 1")
@@ -396,11 +404,12 @@ def generate_pyvis_visualization(mod_dict, dotfile=''):
         nx.draw(nx_graph)
         write_dot(nx_graph, dotfile)
 
-    net = Network(directed=True)
-    net.from_nx(nx_graph)
-    net.show_buttons()
-    net.toggle_physics(True)
-    net.show('mygraph.html', notebook=False)
+    if show:
+        net = Network(directed=True)
+        net.from_nx(nx_graph)
+        net.show_buttons()
+        net.toggle_physics(True)
+        net.show('mygraph.html', notebook=False)
 
 def main():
 
@@ -448,9 +457,9 @@ def main():
 
     # Creates the pyvis visualization
     if args.dotfile is not None:
-        generate_pyvis_visualization(mod_dict, dotfile=args.dotfile)
+        generate_pyvis_visualization(mod_dict, dotfile=args.dotfile, show=args.show_graph)
     else:
-        generate_pyvis_visualization(mod_dict)
+        generate_pyvis_visualization(mod_dict, show=args.show_graph)
 
     if endnotice:
         eprint("Notice: consider adding one of the filter functions (parent_mod_filter_func or import_mod_filter_func) to modfilter module or removing modfilter module completely.")
